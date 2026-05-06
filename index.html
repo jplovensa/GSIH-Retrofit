@@ -14,6 +14,8 @@
             position: absolute;
             inset: 0;
             background-color: #050505;
+            background-image: radial-gradient(circle at center, rgba(16, 185, 129, 0.1) 0%, transparent 50%), linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
+            background-size: 100% 100%, 40px 40px, 40px 40px;
             z-index: 100;
             display: flex;
             flex-direction: column;
@@ -28,6 +30,7 @@
             width: 100%;
             height: 100%;
             background-color: rgba(0,0,0,0.7);
+            background-image: radial-gradient(circle at 50% 0%, rgba(16, 185, 129, 0.15) 0%, transparent 70%);
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -62,20 +65,42 @@
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             pointer-events: none; z-index: 40; display: none; flex-direction: column;
             justify-content: space-between; padding: 20px; box-sizing: border-box;
+            background: linear-gradient(90deg, rgba(0,0,0,0.6) 0%, transparent 40%);
         }
         .slide-panel {
             pointer-events: auto; width: 100%; max-width: 450px;
-            background: rgba(10, 10, 12, 0.9); border: 1px solid rgba(16, 185, 129, 0.3);
-            border-left: 4px solid #10b981; padding: 25px; border-radius: 8px;
-            backdrop-filter: blur(10px); color: white;
-            transform: translateX(-50px); opacity: 0; transition: all 0.5s ease;
+            background: linear-gradient(145deg, rgba(10, 10, 12, 0.95) 0%, rgba(16, 185, 129, 0.05) 100%);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+            border-left: 4px solid #10b981; padding: 30px; border-radius: 8px;
+            backdrop-filter: blur(15px); color: white;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.5), inset 0 0 20px rgba(16, 185, 129, 0.05);
+            transform: translateX(-50px); opacity: 0; transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
             margin-top: 20px;
+            position: relative;
+            overflow: hidden;
         }
+        .slide-panel::before {
+            content: ''; position: absolute; top: 0; left: -100%; width: 50%; height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(16, 185, 129, 0.1), transparent);
+            animation: scanline 4s infinite linear;
+        }
+        @keyframes scanline { 100% { left: 200%; } }
+        
         @media(min-width: 768px) {
             #presentation-ui { padding: 40px; }
             .slide-panel { margin-top: 0; }
         }
         .slide-panel.visible { transform: translateX(0); opacity: 1; }
+        
+        .fjall-badge {
+            display: none; background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.5);
+            color: #34d399; padding: 4px 10px; border-radius: 4px; font-size: 0.65rem;
+            text-transform: uppercase; letter-spacing: 0.1em; font-weight: bold; margin-bottom: 15px;
+            align-items: center; gap: 6px; width: fit-content;
+        }
+        .fjall-badge.active { display: flex; animation: pulseBadge 2s infinite; }
+        @keyframes pulseBadge { 0%, 100% { box-shadow: 0 0 0 rgba(16, 185, 129, 0); } 50% { box-shadow: 0 0 10px rgba(16, 185, 129, 0.3); } }
+
         .tour-controls {
             pointer-events: auto; align-self: flex-end; display: flex; gap: 10px;
             align-items: center; background: rgba(0,0,0,0.8); padding: 10px 15px;
@@ -98,6 +123,11 @@
             position: absolute; inset: 0; background: rgba(0,0,0,0.9); z-index: 60;
             display: none; flex-direction: column; align-items: center; justify-content: center;
         }
+        .game-view { display: none; }
+        .game-view.active { display: block; animation: fadeIn 0.5s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* Game 1: Flatpack Styles */
         .eps-panel {
             width: 60px; height: 150px; background: #f5f5f5; border: 2px solid #ccc;
             border-radius: 4px; cursor: pointer; transition: all 0.3s;
@@ -105,58 +135,104 @@
         }
         .eps-panel.snapped { background: #10b981; color: white; border-color: #059669; transform: scale(0.95); pointer-events: none; }
 
+        /* Custom Progress Bars */
+        .race-bar { transition: width 3s cubic-bezier(0.25, 1, 0.5, 1); }
+
     </style>
 </head>
 <body>
 
     <!-- Cinematic Opening Loader -->
     <div id="opening-loader">
-        <h1 class="text-3xl md:text-5xl font-bold tracking-widest mb-6 text-white text-center">GSIH <span class="text-emerald-500">x</span> GREENSHIFT</h1>
-        <div class="w-64 h-1 bg-gray-800 rounded overflow-hidden">
-            <div id="loader-bar" class="h-full bg-emerald-500 w-0 transition-all duration-300"></div>
+        <div class="absolute inset-0 bg-[linear-gradient(rgba(16,185,129,0.05)_1px,transparent_1px),linear-gradient(90deg,rgba(16,185,129,0.05)_1px,transparent_1px)] bg-[size:40px_40px] z-0"></div>
+        <div class="z-10 flex flex-col items-center">
+            <p class="text-emerald-500 tracking-[0.4em] text-xs font-bold uppercase mb-4 shadow-emerald-500/50 drop-shadow-md">Prepared for KOMDIGI</p>
+            <h1 class="text-3xl md:text-5xl font-bold tracking-widest mb-6 text-white text-center leading-tight">
+                GARUDA SPARK <br/>INNOVATION HUB
+                <span class="block text-emerald-500 font-light text-xl md:text-3xl mt-4 flex items-center justify-center gap-4">
+                    <span class="h-px w-8 md:w-16 bg-emerald-500/50"></span>
+                    MEETS GREENSHIFT
+                    <span class="h-px w-8 md:w-16 bg-emerald-500/50"></span>
+                </span>
+            </h1>
+            <div class="w-72 h-1 bg-gray-800 rounded overflow-hidden relative mt-4">
+                <div id="loader-bar" class="h-full bg-emerald-500 w-0 transition-all duration-300 shadow-[0_0_15px_#10b981]"></div>
+            </div>
+            <p id="loader-text" class="mt-8 text-xs tracking-[0.3em] text-emerald-400/80 uppercase animate-pulse">Fusing Technology & Sustainability...</p>
         </div>
-        <p id="loader-text" class="mt-6 text-xs tracking-[0.3em] text-gray-500 uppercase">Generating 3D Environment...</p>
     </div>
 
     <!-- Cinematic Closing Loader -->
-    <div id="closing-loader" class="opacity-0 invisible">
-        <h1 class="text-4xl md:text-6xl font-bold tracking-tight mb-4 text-white text-center">LEAD THE FUTURE.</h1>
-        <p class="text-emerald-500 tracking-[0.2em] uppercase text-sm md:text-lg">The Pioneer of the Green Zone</p>
-        <button id="btn-restart" class="mt-10 border border-emerald-500 text-emerald-500 hover:bg-emerald-500 hover:text-white px-8 py-3 rounded uppercase tracking-wider text-sm transition-colors">Return to Hub</button>
+    <div id="closing-loader" class="opacity-0 invisible relative z-50">
+        <div class="absolute inset-0 bg-[linear-gradient(rgba(16,185,129,0.05)_1px,transparent_1px),linear-gradient(90deg,rgba(16,185,129,0.05)_1px,transparent_1px)] bg-[size:40px_40px] z-0 pointer-events-none"></div>
+        
+        <div class="z-10 flex flex-col items-center px-4 w-full max-w-4xl mx-auto">
+            <div class="w-16 h-16 border-4 border-emerald-500 rounded-full flex items-center justify-center mb-6 shadow-[0_0_30px_rgba(16,185,129,0.3)]">
+                <div class="w-8 h-8 bg-emerald-500 rounded-full animate-ping"></div>
+            </div>
+            <h1 class="text-4xl md:text-6xl font-bold tracking-tight mb-4 text-white text-center">LEAD THE FUTURE.</h1>
+            <p class="text-emerald-400 tracking-[0.3em] uppercase text-sm md:text-lg font-light text-center">The Pioneer of Jakarta's Green Zone</p>
+
+            <!-- GSIH Story -->
+            <div class="mt-8 md:mt-12 text-center w-full relative">
+                <div class="absolute -inset-4 bg-emerald-900/20 blur-xl z-0 rounded-full"></div>
+                <div class="relative z-10 border-t border-b border-emerald-500/30 py-8 bg-black/40 backdrop-blur-md rounded-2xl shadow-2xl p-6 md:p-10">
+                    <p class="text-gray-300 leading-relaxed text-sm md:text-lg">
+                        What happens when the architects of Indonesia's digital future decide to build in the physical world?
+                    </p>
+                    <p class="text-white font-bold mt-4 text-base md:text-2xl tracking-wide leading-relaxed">
+                        KOMDIGI isn't just opening an innovation hub.<br/>
+                        You are writing a physical manifesto for <span class="text-emerald-400">sustainable infrastructure.</span>
+                    </p>
+                    <p class="text-emerald-500 text-xs md:text-sm mt-6 uppercase tracking-widest font-bold">
+                        When the next generation asks where the shift began, point them to GSIH.
+                    </p>
+                </div>
+            </div>
+
+            <button id="btn-restart" class="mt-12 z-20 relative border border-emerald-500 text-emerald-500 hover:bg-emerald-500 hover:text-white px-10 py-4 rounded font-bold uppercase tracking-[0.2em] text-xs transition-all shadow-[0_0_15px_rgba(16,185,129,0.2)] hover:shadow-[0_0_25px_rgba(16,185,129,0.5)]">Return to Dashboard</button>
+        </div>
     </div>
 
     <!-- UI Overlays -->
     <div id="blocker" style="display: none;">
-        <div id="instructions" class="p-6 md:p-8 border border-gray-700 rounded-xl bg-black/60 md:bg-black/50 hover:bg-black/80 transition-all w-11/12 max-w-lg shadow-2xl backdrop-blur-md">
-            <h1 class="text-3xl md:text-4xl font-bold tracking-tight mb-2 text-white">GARUDA SPARK <br/><span class="text-emerald-500">INNOVATION HUB</span></h1>
-            <p class="text-gray-300 mb-6 uppercase tracking-widest text-xs md:text-sm">GreenShift - Retrofit Proposal</p>
-            <div class="space-y-3 text-left bg-gray-900/50 p-4 md:p-6 rounded-lg mb-6 text-sm">
-                <button id="btn-tour" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 px-4 rounded-lg transition-colors flex justify-between items-center group shadow-lg shadow-emerald-900/50">
-                    <span>Guided Cinematic Tour</span>
-                    <span class="group-hover:translate-x-1 transition-transform">→</span>
+        <div id="instructions" class="p-6 md:p-10 border border-gray-700/50 rounded-2xl bg-black/70 hover:bg-black/80 transition-all w-11/12 max-w-lg shadow-[0_0_50px_rgba(0,0,0,0.8)] backdrop-blur-xl relative overflow-hidden">
+            <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-emerald-500 to-transparent"></div>
+            <p class="text-emerald-500 font-bold tracking-[0.2em] text-[10px] uppercase mb-2">KOMDIGI Initiative</p>
+            <h1 class="text-3xl md:text-5xl font-bold tracking-tight mb-2 text-white">GARUDA SPARK <br/><span class="text-emerald-400 font-light">INNOVATION HUB</span></h1>
+            <p class="text-gray-400 mb-8 uppercase tracking-widest text-xs">GreenShift - Immersive Proposal</p>
+            <div class="space-y-4 text-left bg-gray-900/60 p-5 md:p-6 rounded-xl mb-6 text-sm border border-gray-800">
+                <button id="btn-tour" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-4 px-5 rounded-lg transition-all flex justify-between items-center group shadow-[0_0_20px_rgba(16,185,129,0.3)] hover:shadow-[0_0_30px_rgba(16,185,129,0.5)]">
+                    <span class="tracking-wide">Launch Green Hub Tour</span>
+                    <span class="group-hover:translate-x-2 transition-transform">→</span>
                 </button>
-                <button id="btn-roam" class="w-full bg-transparent border border-gray-600 hover:border-white text-gray-300 hover:text-white font-bold py-3 px-4 rounded-lg transition-colors flex justify-between items-center">
-                    <span>Free Roam Simulation</span>
+                <button id="btn-roam" class="w-full bg-black/50 border border-gray-600 hover:border-emerald-500 text-gray-300 hover:text-white font-bold py-4 px-5 rounded-lg transition-colors flex justify-between items-center group">
+                    <span class="tracking-wide">Interactive Free Roam</span>
+                    <span class="opacity-0 group-hover:opacity-100 transition-opacity">⌖</span>
                 </button>
             </div>
-            <p class="text-xs text-gray-500 text-center uppercase tracking-wider hidden md:block">Use WASD & Mouse to navigate in Free Roam</p>
-            <p class="text-xs text-gray-500 text-center uppercase tracking-wider md:hidden">Use touch controls to navigate in Free Roam</p>
+            <p class="text-[10px] text-gray-500 text-center uppercase tracking-widest hidden md:block opacity-70">Use WASD & Mouse to navigate in Free Roam</p>
+            <p class="text-[10px] text-gray-500 text-center uppercase tracking-widest md:hidden opacity-70">Use touch controls to navigate in Free Roam</p>
         </div>
     </div>
 
     <!-- Presentation UI -->
     <div id="presentation-ui">
         <div class="slide-panel visible" id="slide-panel">
+            <div id="fjall-badge" class="fjall-badge active">
+                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="currentColor" viewBox="0 0 16 16"><path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z"/><path d="M10.97 4.97a.235.235 0 0 0-.02.022L7.477 9.417 5.384 7.323a.75.75 0 0 0-1.06 1.06L6.97 11.03a.75.75 0 0 0 1.079-.02l3.992-4.99a.75.75 0 0 0-1.071-1.05z"/></svg>
+                Proprietary Tech Advantage
+            </div>
             <p class="text-emerald-500 font-bold tracking-widest text-[10px] md:text-xs uppercase mb-1 md:mb-2" id="slide-subtitle">Phase</p>
-            <h2 class="text-2xl md:text-3xl font-bold mb-3 md:mb-4" id="slide-title">Title</h2>
-            <p class="text-gray-300 text-xs md:text-sm leading-relaxed mb-4 md:mb-6" id="slide-desc">Description</p>
+            <h2 class="text-3xl md:text-4xl font-bold mb-3 md:mb-5 text-white tracking-tight" id="slide-title">Title</h2>
+            <p class="text-gray-300 text-xs md:text-sm leading-relaxed mb-5 md:mb-6" id="slide-desc">Description</p>
             
             <!-- Game Injection Point -->
-            <div id="game-trigger-container" class="hidden mb-4">
-                <button id="btn-play-game" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white py-2 rounded text-sm font-bold uppercase tracking-wider animate-pulse">Try Interactive Assembly</button>
+            <div id="game-trigger-container" class="mb-5">
+                <button id="btn-play-game" class="w-full bg-emerald-900/50 border border-emerald-500 hover:bg-emerald-600 text-white py-3 rounded-lg text-xs font-bold uppercase tracking-widest transition-all shadow-[0_0_15px_rgba(16,185,129,0.2)]">Interactive Demo</button>
             </div>
 
-            <div class="bg-black/50 p-3 md:p-4 rounded text-xs md:text-sm border border-gray-800" id="slide-stats">
+            <div class="bg-black/60 p-4 md:p-5 rounded-lg text-xs md:text-sm border border-gray-700/50" id="slide-stats">
                 <!-- Stats injected here -->
             </div>
         </div>
@@ -169,39 +245,123 @@
         </div>
     </div>
 
-    <!-- Mini Game Overlay -->
+    <!-- Mini Game Overlay (All 5 Games) -->
     <div id="minigame-overlay">
-        <div class="bg-gray-900 border border-emerald-500 p-8 rounded-xl max-w-md w-11/12 text-center shadow-2xl shadow-emerald-900/20">
-            <h2 class="text-2xl font-bold text-white mb-2">Fjäll EPS Flatpack</h2>
-            <p class="text-gray-400 text-sm mb-8">Tap the loose panels below to snap them perfectly into the mall framework. No drilling required.</p>
+        <div class="bg-gray-900 border border-emerald-500 p-8 rounded-xl max-w-md w-11/12 text-center shadow-2xl shadow-emerald-900/20 relative overflow-hidden">
             
-            <div class="flex justify-center gap-2 mb-8 h-[160px] p-2 border border-gray-700 rounded bg-black/50 relative" id="game-zone">
-                <div class="eps-panel absolute" style="left: 10%; top: 10px; transform: rotate(-10deg);" onclick="snapPanel(this, 1)">1</div>
-                <div class="eps-panel absolute" style="left: 40%; top: 20px; transform: rotate(5deg);" onclick="snapPanel(this, 2)">2</div>
-                <div class="eps-panel absolute" style="left: 70%; top: 5px; transform: rotate(-5deg);" onclick="snapPanel(this, 3)">3</div>
-                
-                <!-- Target Slots -->
-                <div class="absolute w-[60px] h-[150px] border-2 border-dashed border-gray-600 rounded flex items-center justify-center text-gray-600 font-bold" style="left: 40px; top: 3px; z-index: 0;">Slot 1</div>
-                <div class="absolute w-[60px] h-[150px] border-2 border-dashed border-gray-600 rounded flex items-center justify-center text-gray-600 font-bold" style="left: 120px; top: 3px; z-index: 0;">Slot 2</div>
-                <div class="absolute w-[60px] h-[150px] border-2 border-dashed border-gray-600 rounded flex items-center justify-center text-gray-600 font-bold" style="left: 200px; top: 3px; z-index: 0;">Slot 3</div>
+            <!-- Game 0: Thermal Efficiency Simulator -->
+            <div id="game-view-0" class="game-view">
+                <h2 class="text-2xl font-bold text-white mb-2">Eco-Efficiency Simulator</h2>
+                <p class="text-gray-400 text-sm mb-6">Test the thermal and acoustic performance of traditional brick vs Fjäll EPS.</p>
+                <div class="flex gap-2 justify-center mb-6">
+                    <button id="btn-brick" onclick="simThermal('brick')" class="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white text-xs font-bold rounded">Standard Brick</button>
+                    <button id="btn-fjall" onclick="simThermal('fjall')" class="px-4 py-2 bg-emerald-700 hover:bg-emerald-600 text-white text-xs font-bold rounded shadow-[0_0_10px_rgba(16,185,129,0.5)]">Fjäll EPS (20cm)</button>
+                </div>
+                <div class="bg-black/50 border border-gray-700 rounded p-4 text-left space-y-4 mb-4">
+                    <div>
+                        <div class="flex justify-between text-xs text-gray-400 mb-1"><span>AC Power Load</span> <span id="ac-load-txt">100% (High Drain)</span></div>
+                        <div class="w-full bg-gray-800 rounded h-2"><div id="ac-load-bar" class="bg-red-500 h-2 rounded transition-all duration-500" style="width: 100%"></div></div>
+                    </div>
+                    <div>
+                        <div class="flex justify-between text-xs text-gray-400 mb-1"><span>Acoustic Bleed (Noise)</span> <span id="noise-txt">45 dB (Leaking)</span></div>
+                        <div class="w-full bg-gray-800 rounded h-2"><div id="noise-bar" class="bg-orange-500 h-2 rounded transition-all duration-500" style="width: 80%"></div></div>
+                    </div>
+                </div>
+                <p id="thermal-success" class="text-emerald-400 text-sm font-bold opacity-0 transition-opacity">Optimal Green Hub Environment Achieved!</p>
             </div>
 
-            <div id="game-success" class="hidden mb-6">
-                <p class="text-emerald-400 font-bold text-lg mb-1">Assembly Complete!</p>
-                <p class="text-xs text-gray-300 uppercase tracking-wider">5x Faster Installation Achieved</p>
+            <!-- Game 1: Flatpack Assembly -->
+            <div id="game-view-1" class="game-view">
+                <h2 class="text-2xl font-bold text-white mb-2">Fjäll Flatpack Puzzle</h2>
+                <p class="text-gray-400 text-sm mb-6">Tap the loose panels below to snap them perfectly into the mall framework. No wet-work required.</p>
+                <div class="flex justify-center gap-2 mb-6 h-[160px] p-2 border border-gray-700 rounded bg-black/50 relative" id="game-zone">
+                    <div class="eps-panel absolute" style="left: 10%; top: 10px; transform: rotate(-10deg);" onclick="snapPanel(this, 1)">1</div>
+                    <div class="eps-panel absolute" style="left: 40%; top: 20px; transform: rotate(5deg);" onclick="snapPanel(this, 2)">2</div>
+                    <div class="eps-panel absolute" style="left: 70%; top: 5px; transform: rotate(-5deg);" onclick="snapPanel(this, 3)">3</div>
+                    <div class="absolute w-[60px] h-[150px] border-2 border-dashed border-gray-600 rounded flex items-center justify-center text-gray-600 font-bold" style="left: 40px; top: 3px; z-index: 0;">Slot 1</div>
+                    <div class="absolute w-[60px] h-[150px] border-2 border-dashed border-gray-600 rounded flex items-center justify-center text-gray-600 font-bold" style="left: 120px; top: 3px; z-index: 0;">Slot 2</div>
+                    <div class="absolute w-[60px] h-[150px] border-2 border-dashed border-gray-600 rounded flex items-center justify-center text-gray-600 font-bold" style="left: 200px; top: 3px; z-index: 0;">Slot 3</div>
+                </div>
+                <p id="flatpack-success" class="text-emerald-400 text-sm font-bold hidden mb-2">Assembly Complete! 5x Faster Installation.</p>
             </div>
 
-            <button onclick="closeGame()" id="btn-close-game" class="w-full bg-gray-700 hover:bg-gray-600 text-white font-bold py-3 rounded opacity-50 cursor-not-allowed transition-all" disabled>Return to Tour</button>
+            <!-- Game 2: Cast Acrylic Weight Test -->
+            <div id="game-view-2" class="game-view">
+                <h2 class="text-2xl font-bold text-white mb-2">Weight Comparison Test</h2>
+                <p class="text-gray-400 text-sm mb-6">Compare hoisting heavy tempered glass vs lightweight cast acrylic for rapid night shifts.</p>
+                <div class="flex justify-around items-end h-32 border-b border-gray-700 pb-2 mb-6">
+                    <div class="flex flex-col items-center">
+                        <div id="glass-block" class="w-16 h-20 bg-blue-900/50 border-2 border-blue-400 transition-all duration-1000 ease-in-out translate-y-0"></div>
+                        <span class="text-xs text-gray-400 mt-2">Tempered Glass</span>
+                    </div>
+                    <div class="flex flex-col items-center">
+                        <div id="acrylic-block" class="w-16 h-20 bg-emerald-900/50 border-2 border-emerald-400 transition-all duration-300 ease-out translate-y-0 shadow-[0_0_15px_rgba(16,185,129,0.5)]"></div>
+                        <span class="text-xs text-gray-400 mt-2 text-emerald-400 font-bold">12mm Acrylic</span>
+                    </div>
+                </div>
+                <button onclick="simLift()" class="w-full py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded mb-4">Simulate Installation Lift</button>
+                <p id="lift-success" class="text-emerald-400 text-sm font-bold opacity-0 transition-opacity">Acrylic lifted safely! Labor costs minimized.</p>
+            </div>
+
+            <!-- Game 3: Zero Screw Reversibility -->
+            <div id="game-view-3" class="game-view">
+                <h2 class="text-2xl font-bold text-white mb-2">Mall Damage Check</h2>
+                <p class="text-gray-400 text-sm mb-6">Simulate the end-of-lease tear down to see the condition of FX Sudirman's floor.</p>
+                <div class="relative w-full h-32 bg-gray-800 border border-gray-600 rounded mb-6 overflow-hidden flex items-center justify-center">
+                    <div class="absolute inset-0 bg-black/80 flex items-center justify-center text-gray-500 text-xs italic">Original Mall Flooring</div>
+                    <div id="office-layer" class="absolute inset-0 bg-gray-300 border-b-4 border-gray-400 flex items-center justify-center text-gray-800 font-bold transition-all duration-1000 ease-in-out cursor-pointer hover:bg-gray-200">
+                        KOMDIGI OFFICE LAYER
+                    </div>
+                </div>
+                <button onclick="simTearDown()" class="w-full py-2 bg-yellow-600 hover:bg-yellow-500 text-white font-bold rounded mb-4">Trigger Tear Down</button>
+                <p id="teardown-success" class="text-emerald-400 text-sm font-bold opacity-0 transition-opacity">0 Scratches. 0 Drill Holes. 100% Recovered.</p>
+            </div>
+
+            <!-- Game 4: Timeline Race -->
+            <div id="game-view-4" class="game-view">
+                <h2 class="text-2xl font-bold text-white mb-2">Launch Timeline Race</h2>
+                <p class="text-gray-400 text-sm mb-6">See how the 600M budget guarantees speed by removing curing and wet-work.</p>
+                <div class="space-y-4 text-left mb-6">
+                    <div>
+                        <div class="flex justify-between text-xs mb-1"><span class="text-gray-400">Traditional Build (14 Weeks)</span></div>
+                        <div class="w-full bg-gray-800 rounded h-4 overflow-hidden"><div id="race-trad" class="bg-red-500 h-4 race-bar" style="width: 0%"></div></div>
+                    </div>
+                    <div>
+                        <div class="flex justify-between text-xs mb-1"><span class="text-emerald-400 font-bold">GreenShift Modular (35 Nights)</span></div>
+                        <div class="w-full bg-gray-800 rounded h-4 overflow-hidden"><div id="race-green" class="bg-emerald-500 h-4 race-bar shadow-[0_0_10px_#10b981]" style="width: 0%"></div></div>
+                    </div>
+                </div>
+                <button onclick="simRace()" class="w-full py-2 bg-emerald-700 hover:bg-emerald-600 text-white font-bold rounded mb-4">Start Construction</button>
+                <p id="race-success" class="text-emerald-400 text-sm font-bold opacity-0 transition-opacity">Launch Deadline Met! Ready for KOMDIGI.</p>
+            </div>
+
+            <!-- Shared Close Button -->
+            <div class="mt-6 border-t border-gray-700 pt-6">
+                <button onclick="closeGame()" id="btn-close-game" class="w-full bg-gray-700 hover:bg-gray-600 text-white font-bold py-3 rounded opacity-50 cursor-not-allowed transition-all shadow-[0_0_10px_rgba(0,0,0,0.5)]" disabled>Complete Demo to Continue</button>
+            </div>
         </div>
     </div>
 
     <!-- HUD & Mobile Controls -->
     <div class="hud-overlay" style="display: none;">
-        <div class="bg-black/80 border border-gray-800 p-3 rounded-lg backdrop-blur-sm">
-            <h2 class="text-white font-bold text-sm md:text-lg mb-1">GSIH Prototype Zone</h2>
-            <div class="flex items-center gap-2 text-gray-400 text-xs md:text-sm">
+        <div class="bg-black/80 border border-emerald-900/50 p-4 rounded-xl backdrop-blur-md shadow-[0_0_20px_rgba(16,185,129,0.1)]">
+            <h2 class="text-white font-bold text-sm md:text-lg mb-2 flex items-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-emerald-500" fill="currentColor" viewBox="0 0 16 16"><path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z"/><path d="M10.97 4.97a.235.235 0 0 0-.02.022L7.477 9.417 5.384 7.323a.75.75 0 0 0-1.06 1.06L6.97 11.03a.75.75 0 0 0 1.079-.02l3.992-4.99a.75.75 0 0 0-1.071-1.05z"/></svg>
+                GSIH Environmental Core
+            </h2>
+            <div class="space-y-1 mb-3">
+                <div class="flex justify-between text-[10px] md:text-xs">
+                    <span class="text-gray-400">Air Quality & Thermal</span>
+                    <span class="text-emerald-400 font-mono">98% OPTIMAL</span>
+                </div>
+                <div class="flex justify-between text-[10px] md:text-xs">
+                    <span class="text-gray-400">Acoustic EPS Isolation</span>
+                    <span class="text-emerald-400 font-mono">ACTIVE</span>
+                </div>
+            </div>
+            <div class="flex items-center gap-2 text-gray-500 text-xs md:text-sm border-t border-gray-800 pt-2">
                 <div class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
-                Free Roam Active
+                Free Roam Simulation
             </div>
         </div>
     </div>
@@ -248,42 +408,43 @@
         let targetCamLookAt = new THREE.Vector3();
         let currentLookAt = new THREE.Vector3();
 
-        // Presentation Data
+        // Presentation Data - Rewritten for KOMDIGI Green Hub Narrative (ALL games active)
         const slides = [
             {
-                subtitle: "GSIH x GreenShift", title: "The Core Vision",
-                desc: "GSIH is the genesis of Jakarta's premier Green Hub. We are merging a high-tech 'Monochrome Sleek' aesthetic with environmentally responsible engineering.",
-                stats: `<div class="flex justify-between mb-1"><span class="text-gray-400">Total Area</span><span class="font-bold">260 sqm</span></div>
-                        <div class="flex justify-between"><span class="text-gray-400">Location</span><span class="font-bold">FX Sudirman</span></div>`,
-                camPos: new THREE.Vector3(-3, 2.5, -2), lookAt: new THREE.Vector3(-5, 1.5, 3), hasGame: false
+                subtitle: "KOMDIGI x GreenShift", title: "The Green Hub Vision",
+                desc: "Transforming GSIH into the premier sustainable ecosystem of Jakarta. We merge a high-tech 'Monochrome Sleek' aesthetic with environmentally responsible, zero-waste engineering.",
+                stats: `<div class="flex justify-between mb-2"><span class="text-gray-400">Total Innovation Area</span><span class="font-bold text-white">260 sqm</span></div>
+                        <div class="flex justify-between"><span class="text-gray-400">Hub Location</span><span class="font-bold text-emerald-400">FX Sudirman</span></div>`,
+                camPos: new THREE.Vector3(-3, 2.5, -2), lookAt: new THREE.Vector3(-5, 1.5, 3), gameId: 0
             },
             {
-                subtitle: "Material Innovation", title: "Fjäll EPS Panels",
-                desc: "Replacing obsolete, dust-heavy brick with advanced 20cm EPS modular walls built slab-to-slab (3.6m). Superior acoustic isolation for Komdigi.",
-                stats: `<div class="flex justify-between mb-1"><span class="text-gray-400">Panel Thickness</span><span class="font-bold text-white">20 cm</span></div>
-                        <div class="flex justify-between"><span class="text-gray-400">Sourcing</span><span class="font-bold text-emerald-400">100% Local</span></div>`,
-                camPos: new THREE.Vector3(-1.0, 1.6, -1.0), lookAt: new THREE.Vector3(-0.5, 1.6, 3), hasGame: true
+                subtitle: "Material Innovation", title: "The Fjäll Advantage",
+                desc: "We replace obsolete, dust-heavy brick with advanced 20cm Fjäll EPS modular panels. Built slab-to-slab (3.6m), they provide superior acoustic isolation for confidential KOMDIGI sessions while lowering AC energy loads.",
+                stats: `<div class="flex justify-between mb-2"><span class="text-gray-400">Thermal/Acoustic Barrier</span><span class="font-bold text-white">20cm Smart EPS</span></div>
+                        <div class="flex justify-between"><span class="text-gray-400">Sustainability Factor</span><span class="font-bold text-emerald-400">100% Local Raw Materials</span></div>`,
+                camPos: new THREE.Vector3(-1.0, 1.6, -1.0), lookAt: new THREE.Vector3(-0.5, 1.6, 3), gameId: 1
             },
             {
-                subtitle: "Value Engineering", title: "Crystal Clear Logic",
-                desc: "Employing high-impact 12mm clear cast acrylic for meeting room transparencies instead of heavy, expensive tempered glass. Maximizes installation speed.",
-                stats: `<div class="flex justify-between mb-1"><span class="text-gray-400">Material Variant</span><span class="font-bold text-white">12mm Cast Acrylic</span></div>
-                        <div class="flex justify-between"><span class="text-gray-400">Benefit</span><span class="font-bold text-emerald-400">Night-Shift Speed</span></div>`,
-                camPos: new THREE.Vector3(-4.5, 1.6, 3.4), lookAt: new THREE.Vector3(-2.35, 1.6, 3.4), hasGame: false
+                subtitle: "Eco-Value Engineering", title: "Crystal Clear Logic",
+                desc: "To preserve the open 'Glass Office' feel while fiercely protecting KOMDIGI's capital, we employ high-impact 12mm clear cast acrylic. This delivers visual parity to tempered glass at a fraction of the weight and carbon footprint.",
+                stats: `<div class="flex justify-between mb-2"><span class="text-gray-400">Transparency Medium</span><span class="font-bold text-white">12mm Cast Acrylic</span></div>
+                        <div class="flex justify-between"><span class="text-gray-400">Strategic Benefit</span><span class="font-bold text-emerald-400">Maximized Night-Shift Speed</span></div>`,
+                camPos: new THREE.Vector3(-4.5, 1.6, 3.4), lookAt: new THREE.Vector3(-2.35, 1.6, 3.4), gameId: 2
             },
             {
-                subtitle: "Structural Agility", title: "Zero-Screw Protocol",
-                desc: "Puzzle-fit, snap-together flooring assembly. We do not drill into the existing mall flooring, ensuring zero structural damage to FX Sudirman.",
-                stats: `<div class="flex justify-between mb-1"><span class="text-gray-400">Flooring Interface</span><span class="font-bold text-white">Premium SPC</span></div>
-                        <div class="flex justify-between"><span class="text-gray-400">Structural Damage</span><span class="font-bold text-emerald-400">Zero Drilling</span></div>`,
-                camPos: new THREE.Vector3(-6, 1.0, 5), lookAt: new THREE.Vector3(-6, 0, 2), hasGame: false
+                subtitle: "Non-Destructive Infrastructure", title: "Zero-Screw Protocol",
+                desc: "GSIH must be able to evolve. Our puzzle-fit, snap-together flooring assembly guarantees we do not drill into the existing mall flooring. The entire office can be reconfigured without leaving a single structural scar.",
+                stats: `<div class="flex justify-between mb-2"><span class="text-gray-400">Flooring Interface</span><span class="font-bold text-white">Premium SPC (Snap-Fit)</span></div>
+                        <div class="flex justify-between"><span class="text-gray-400">Structural Impact</span><span class="font-bold text-emerald-400">Zero Drilling Required</span></div>`,
+                camPos: new THREE.Vector3(-6, 1.0, 5), lookAt: new THREE.Vector3(-6, 0, 2), gameId: 3
             },
             {
-                subtitle: "Financial Architecture", title: "The 600M Guarantee",
-                desc: "Our modular approach eliminates wet-work, dust, and curing delays—guaranteeing operational readiness in just 35 nights within budget.",
-                stats: `<div class="flex justify-between mb-1"><span class="text-gray-400">Launch Timeline</span><span class="font-bold text-yellow-400">5 Weeks</span></div>
-                        <div class="flex justify-between mt-2 pt-2 border-t border-gray-700"><span class="text-gray-400 uppercase text-[10px] mt-1">Target Budget</span><span class="font-bold text-white">600,000,000 IDR</span></div>`,
-                camPos: new THREE.Vector3(-3, 6, 8), lookAt: new THREE.Vector3(-2, 0, 0), hasGame: false
+                subtitle: "Sustainable Financials", title: "The 600M Guarantee",
+                desc: "By eliminating wet-work, dust, and curing delays, our modular approach respects FX Sudirman's strict operation hours—guaranteeing KOMDIGI's operational readiness in just 35 nights.",
+                stats: `<div class="flex justify-between mb-2"><span class="text-gray-400">Guaranteed Launch</span><span class="font-bold text-yellow-400">5-Week Rapid Launch</span></div>
+                        <div class="flex justify-between mb-3"><span class="text-gray-400">Core Office Build</span><span class="font-bold text-white">495,490,000 IDR</span></div>
+                        <div class="flex justify-between mt-3 pt-3 border-t border-gray-700/50"><span class="text-gray-400 uppercase text-xs mt-1">Total Target Budget</span><span class="font-bold text-emerald-400 text-lg">600,000,000 IDR</span></div>`,
+                camPos: new THREE.Vector3(-3, 6, 8), lookAt: new THREE.Vector3(-2, 0, 0), gameId: 4
             }
         ];
 
@@ -334,6 +495,10 @@
             renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); // optimize mobile
             renderer.shadowMap.enabled = true;
             renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            renderer.outputEncoding = THREE.sRGBEncoding; // Gamma correction for premium render finish
+            renderer.toneMapping = THREE.ACESFilmicToneMapping; // Cinematic contrast
+            renderer.toneMappingExposure = 1.1;
+
             document.getElementById('canvas-container').appendChild(renderer.domElement);
 
             // UI Listeners
@@ -431,10 +596,29 @@
             const pt1 = new THREE.PointLight(0x00ffaa, 0.4, 10); pt1.position.set(-5, 3.4, -5); scene.add(pt1);
             const pt2 = new THREE.PointLight(0x00ccff, 0.3, 10); pt2.position.set(5, 3.4, 5); scene.add(pt2);
 
-            // Accurate Materials
-            const floorMat = new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.2, metalness: 0.1 }); 
-            const wallEpsMat = new THREE.MeshStandardMaterial({ color: 0xf5f5f5, roughness: 0.9, metalness: 0.0 }); 
-            const darkWallMat = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.6 }); 
+            // Immersive Green Tech Particles
+            const particleCount = 300;
+            const particleGeo = new THREE.BufferGeometry();
+            const posArray = new Float32Array(particleCount * 3);
+            for(let i=0; i<particleCount*3; i++) {
+                posArray[i] = (Math.random() - 0.5) * 25;
+            }
+            particleGeo.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
+            const particleMat = new THREE.PointsMaterial({
+                size: 0.04,
+                color: 0x10b981,
+                transparent: true,
+                opacity: 0.6,
+                blending: THREE.AdditiveBlending
+            });
+            window.greenParticles = new THREE.Points(particleGeo, particleMat);
+            window.greenParticles.position.y = 1.5;
+            scene.add(window.greenParticles);
+
+            // Accurate Materials with upgraded finishes
+            const floorMat = new THREE.MeshStandardMaterial({ color: 0x151515, roughness: 0.15, metalness: 0.3 }); // Sleeker SPC
+            const wallEpsMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.8, metalness: 0.05 }); 
+            const darkWallMat = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.5, metalness: 0.2 }); 
             
             // Dynamic Ceiling Material for Intro Transition
             window.ceilingMat = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.6, transparent: true, opacity: 0.0 }); 
@@ -443,7 +627,7 @@
                 color: 0xffffff, metalness: 0.1, roughness: 0.05, opacity: 0.25,
                 transparent: true, transmission: 0.9, clearcoat: 1.0, side: THREE.DoubleSide
             });
-            const deskMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.2 });
+            const deskMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.1, metalness: 0.1 });
             const legMat = new THREE.MeshStandardMaterial({ color: 0x222222, metalness: 0.8 });
 
             const frostedGlassMat = new THREE.MeshPhysicalMaterial({
@@ -479,6 +663,11 @@
                 const headrest = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.1, 0.05), mat); headrest.position.set(0, 1.05, -0.25); group.add(headrest);
                 const column = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.4), legMat); column.position.y = 0.2; group.add(column);
                 const base = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.25, 0.05), legMat); base.position.y = 0.025; group.add(base);
+                
+                // Add armrests
+                const armL = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.2, 0.3), legMat); armL.position.set(-0.25, 0.6, -0.05); group.add(armL);
+                const armR = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.2, 0.3), legMat); armR.position.set(0.25, 0.6, -0.05); group.add(armR);
+
                 group.position.set(x, 0, z); group.rotation.y = angle; scene.add(group);
             }
             function createTable(w, d, x, z) {
@@ -559,21 +748,23 @@
             // Tables in meeting rooms
             createTable(2.2, 1.0, -0.5, 1.6); // Room 2 (Top)
             createTV(1.2, 1.4, 1.6, -Math.PI / 2); 
-            createOfficeChair(-0.5, 0.8, 0, true);
-            createOfficeChair(-1.2, 1.0, Math.PI/4, true);
-            createOfficeChair(0.2, 1.0, -Math.PI/4, true);
-            createOfficeChair(-0.5, 2.4, Math.PI, true);
-            createOfficeChair(-1.2, 2.2, Math.PI - Math.PI/4, true);
-            createOfficeChair(0.2, 2.2, Math.PI + Math.PI/4, true);
+            // Squared Chairs for Room 2
+            createOfficeChair(-1.1, 0.7, 0, true);
+            createOfficeChair(-0.5, 0.7, 0, true);
+            createOfficeChair( 0.1, 0.7, 0, true);
+            createOfficeChair(-1.1, 2.5, Math.PI, true);
+            createOfficeChair(-0.5, 2.5, Math.PI, true);
+            createOfficeChair( 0.1, 2.5, Math.PI, true);
 
             createTable(2.2, 1.0, -0.5, 5.0); // Room 1 (Bottom)
             createTV(1.2, 1.4, 5.0, -Math.PI / 2); 
-            createOfficeChair(-0.5, 4.2, 0, true);
-            createOfficeChair(-1.2, 4.4, Math.PI/4, true);
-            createOfficeChair(0.2, 4.4, -Math.PI/4, true);
-            createOfficeChair(-0.5, 5.8, Math.PI, true);
-            createOfficeChair(-1.2, 5.6, Math.PI - Math.PI/4, true);
-            createOfficeChair(0.2, 5.6, Math.PI + Math.PI/4, true);
+            // Squared Chairs for Room 1
+            createOfficeChair(-1.1, 4.1, 0, true);
+            createOfficeChair(-0.5, 4.1, 0, true);
+            createOfficeChair( 0.1, 4.1, 0, true);
+            createOfficeChair(-1.1, 5.9, Math.PI, true);
+            createOfficeChair(-0.5, 5.9, Math.PI, true);
+            createOfficeChair( 0.1, 5.9, Math.PI, true);
 
             // 4. Core Block
             createW(4.05, 3.6, 6.8, 3.475, 1.8, 3.4, darkWallMat); 
@@ -584,8 +775,11 @@
             createW(4.2, 3.6, 0.012, -6.275, 1.8, 7.025, glassMat); 
             
             createTable(2.0, 1.0, -6.0, 8.8);
-            createOfficeChair(-6.0, 8.0, 0, false);
-            createOfficeChair(-6.0, 9.6, Math.PI, false);
+            // Squared Chairs for Left Meeting Room
+            createOfficeChair(-6.5, 8.0, 0, false);
+            createOfficeChair(-5.5, 8.0, 0, false);
+            createOfficeChair(-6.5, 9.6, Math.PI, false);
+            createOfficeChair(-5.5, 9.6, Math.PI, false);
 
             // Transit Room / Lobby Furniture
             createBookshelf(5.6, 1.2, -0.8, 0); 
@@ -594,14 +788,18 @@
 
             // Communal Area Desks
             createTable(2.4, 1.2, -5.5, 0.8);
-            createOfficeChair(-5.5, 0.0, 0, false);
-            createOfficeChair(-5.5, 1.6, Math.PI, false);
-            createOfficeChair(-4.6, 0.8, -Math.PI/2, false);
+            // Squared Chairs for Communal Desk 1
+            createOfficeChair(-6.1, 0.0, 0, false);
+            createOfficeChair(-4.9, 0.0, 0, false);
+            createOfficeChair(-6.1, 1.6, Math.PI, false);
+            createOfficeChair(-4.9, 1.6, Math.PI, false);
             
             createTable(2.4, 1.2, -5.5, 3.8);
-            createOfficeChair(-5.5, 3.0, 0, false);
-            createOfficeChair(-5.5, 4.6, Math.PI, false);
-            createOfficeChair(-4.6, 3.8, -Math.PI/2, false);
+            // Squared Chairs for Communal Desk 2
+            createOfficeChair(-6.1, 3.0, 0, false);
+            createOfficeChair(-4.9, 3.0, 0, false);
+            createOfficeChair(-6.1, 4.6, Math.PI, false);
+            createOfficeChair(-4.9, 4.6, Math.PI, false);
         }
 
         // --- Interaction Logic ---
@@ -693,9 +891,6 @@
                 document.getElementById('slide-desc').textContent = slide.desc;
                 document.getElementById('slide-stats').innerHTML = slide.stats;
                 
-                // Show game trigger if applicable
-                document.getElementById('game-trigger-container').style.display = slide.hasGame ? 'block' : 'none';
-
                 targetCamPos.copy(slide.camPos);
                 targetCamLookAt.copy(slide.lookAt);
 
@@ -703,16 +898,29 @@
             }, 400);
         }
 
-        // --- Mini Game Logic ---
-        let snappedCount = 0;
+        // --- All Mini Games Logic ---
         function openMiniGame() {
             document.getElementById('minigame-overlay').style.display = 'flex';
-            snappedCount = 0;
-            document.getElementById('game-success').classList.add('hidden');
             document.getElementById('btn-close-game').disabled = true;
             document.getElementById('btn-close-game').classList.add('opacity-50', 'cursor-not-allowed');
             
-            // Reset panels
+            // Hide all, show current
+            document.querySelectorAll('.game-view').forEach(v => v.classList.remove('active'));
+            const slide = slides[currentSlide];
+            document.getElementById('game-view-' + slide.gameId).classList.add('active');
+
+            // Reset Game 0 (Thermal)
+            document.getElementById('ac-load-bar').style.width = '100%';
+            document.getElementById('ac-load-bar').className = 'bg-red-500 h-2 rounded transition-all duration-500';
+            document.getElementById('ac-load-txt').textContent = '100% (High Drain)';
+            document.getElementById('noise-bar').style.width = '80%';
+            document.getElementById('noise-bar').className = 'bg-orange-500 h-2 rounded transition-all duration-500';
+            document.getElementById('noise-txt').textContent = '45 dB (Leaking)';
+            document.getElementById('thermal-success').style.opacity = '0';
+
+            // Reset Game 1 (Flatpack)
+            snappedCount = 0;
+            document.getElementById('flatpack-success').classList.add('hidden');
             const panels = document.querySelectorAll('.eps-panel');
             panels.forEach((p, idx) => {
                 p.classList.remove('snapped');
@@ -720,13 +928,50 @@
                 p.style.top = (10 + (idx * 5)) + 'px';
                 p.style.transform = `rotate(${[-10, 5, -5][idx]}deg)`;
             });
+
+            // Reset Game 2 (Lift)
+            document.getElementById('glass-block').style.transform = 'translateY(0)';
+            document.getElementById('acrylic-block').style.transform = 'translateY(0)';
+            document.getElementById('lift-success').style.opacity = '0';
+
+            // Reset Game 3 (Tear down)
+            document.getElementById('office-layer').style.transform = 'translateY(0)';
+            document.getElementById('office-layer').style.opacity = '1';
+            document.getElementById('teardown-success').style.opacity = '0';
+
+            // Reset Game 4 (Race)
+            document.getElementById('race-trad').style.width = '0%';
+            document.getElementById('race-green').style.width = '0%';
+            document.getElementById('race-success').style.opacity = '0';
         }
 
+        // Game 0 Action
+        function simThermal(type) {
+            if(type === 'brick') {
+                document.getElementById('ac-load-bar').style.width = '100%';
+                document.getElementById('ac-load-bar').className = 'bg-red-500 h-2 rounded transition-all duration-500';
+                document.getElementById('ac-load-txt').textContent = '100% (High Drain)';
+                document.getElementById('noise-bar').style.width = '80%';
+                document.getElementById('noise-bar').className = 'bg-orange-500 h-2 rounded transition-all duration-500';
+                document.getElementById('noise-txt').textContent = '45 dB (Leaking)';
+            } else {
+                document.getElementById('ac-load-bar').style.width = '40%';
+                document.getElementById('ac-load-bar').className = 'bg-emerald-500 h-2 rounded transition-all duration-500';
+                document.getElementById('ac-load-txt').textContent = '40% (Optimized)';
+                document.getElementById('noise-bar').style.width = '15%';
+                document.getElementById('noise-bar').className = 'bg-emerald-500 h-2 rounded transition-all duration-500';
+                document.getElementById('noise-txt').textContent = 'Sealed';
+                
+                document.getElementById('thermal-success').style.opacity = '1';
+                unlockGameClose();
+            }
+        }
+
+        // Game 1 Action
+        let snappedCount = 0;
         function snapPanel(element, id) {
             if(element.classList.contains('snapped')) return;
             element.classList.add('snapped');
-            
-            // Move to slot position
             const targets = [40, 120, 200];
             element.style.transform = 'rotate(0deg)';
             element.style.left = targets[id-1] + 'px';
@@ -735,13 +980,53 @@
             snappedCount++;
             if(snappedCount === 3) {
                 setTimeout(() => {
-                    document.getElementById('game-success').classList.remove('hidden');
-                    const btn = document.getElementById('btn-close-game');
-                    btn.disabled = false;
-                    btn.classList.remove('opacity-50', 'cursor-not-allowed');
-                    btn.classList.add('hover:bg-emerald-600', 'bg-emerald-700');
+                    document.getElementById('flatpack-success').classList.remove('hidden');
+                    unlockGameClose();
                 }, 500);
             }
+        }
+
+        // Game 2 Action
+        function simLift() {
+            // Glass struggles (heavy)
+            document.getElementById('glass-block').style.transform = 'translateY(-20px)';
+            // Acrylic shoots up effortlessly
+            document.getElementById('acrylic-block').style.transform = 'translateY(-60px)';
+            
+            setTimeout(() => {
+                document.getElementById('lift-success').style.opacity = '1';
+                unlockGameClose();
+            }, 600);
+        }
+
+        // Game 3 Action
+        function simTearDown() {
+            document.getElementById('office-layer').style.transform = 'translateY(-100px) rotate(5deg)';
+            document.getElementById('office-layer').style.opacity = '0';
+            setTimeout(() => {
+                document.getElementById('teardown-success').style.opacity = '1';
+                unlockGameClose();
+            }, 1000);
+        }
+
+        // Game 4 Action
+        function simRace() {
+            // Start Race
+            document.getElementById('race-green').style.width = '100%';
+            document.getElementById('race-trad').style.width = '35%'; // Gets stuck curing
+            
+            setTimeout(() => {
+                document.getElementById('race-success').style.opacity = '1';
+                unlockGameClose();
+            }, 3000);
+        }
+
+        function unlockGameClose() {
+            const btn = document.getElementById('btn-close-game');
+            btn.disabled = false;
+            btn.classList.remove('opacity-50', 'cursor-not-allowed');
+            btn.classList.add('hover:bg-emerald-600', 'bg-emerald-700');
+            btn.textContent = "Return to Tour";
         }
 
         function closeGame() {
@@ -765,6 +1050,8 @@
             document.getElementById('blocker').style.display = 'flex';
             isTourMode = false;
             isFreeRoam = false;
+            // Restore normal look
+            if (window.ceilingMat) window.ceilingMat.opacity = 1.0;
         }
 
         function onWindowResize() {
@@ -776,6 +1063,12 @@
         function animate() {
             requestAnimationFrame(animate);
             const time = performance.now();
+
+            // Rotate immersive green tech particles
+            if (window.greenParticles) {
+                window.greenParticles.rotation.y += 0.0003;
+                window.greenParticles.position.y = 1.5 + Math.sin(time * 0.0005) * 0.1;
+            }
 
             if (isIntroSequence) {
                 // Cinematic Pan from high above
