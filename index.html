@@ -1,0 +1,839 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>GSIH Retrofit - 3D Immersive Mockup</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #000; font-family: 'Inter', sans-serif; touch-action: none; }
+        #canvas-container { width: 100vw; height: 100vh; display: block; }
+        
+        /* Loaders */
+        #opening-loader, #closing-loader {
+            position: absolute;
+            inset: 0;
+            background-color: #050505;
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            transition: opacity 1.5s ease-in-out, visibility 1.5s;
+        }
+
+        /* Menu Blocker */
+        #blocker {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.7);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 50;
+            backdrop-filter: blur(10px);
+        }
+
+        /* HUD & Info */
+        .hud-overlay { position: absolute; bottom: 20px; left: 20px; pointer-events: none; z-index: 10; }
+        
+        #info-panel {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            width: 90%;
+            max-width: 350px;
+            background: rgba(10, 10, 10, 0.85);
+            border: 1px solid #333;
+            color: white;
+            padding: 20px;
+            border-radius: 8px;
+            transform: translateX(120%);
+            transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            z-index: 20;
+            backdrop-filter: blur(10px);
+        }
+        #info-panel.active { transform: translateX(0); }
+
+        /* Presentation UI Styles */
+        #presentation-ui {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none; z-index: 40; display: none; flex-direction: column;
+            justify-content: space-between; padding: 20px; box-sizing: border-box;
+        }
+        .slide-panel {
+            pointer-events: auto; width: 100%; max-width: 450px;
+            background: rgba(10, 10, 12, 0.9); border: 1px solid rgba(16, 185, 129, 0.3);
+            border-left: 4px solid #10b981; padding: 25px; border-radius: 8px;
+            backdrop-filter: blur(10px); color: white;
+            transform: translateX(-50px); opacity: 0; transition: all 0.5s ease;
+            margin-top: 20px;
+        }
+        @media(min-width: 768px) {
+            #presentation-ui { padding: 40px; }
+            .slide-panel { margin-top: 0; }
+        }
+        .slide-panel.visible { transform: translateX(0); opacity: 1; }
+        .tour-controls {
+            pointer-events: auto; align-self: flex-end; display: flex; gap: 10px;
+            align-items: center; background: rgba(0,0,0,0.8); padding: 10px 15px;
+            border-radius: 50px; backdrop-filter: blur(5px); border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        /* Mobile Controls */
+        #mobile-controls {
+            display: none; position: absolute; bottom: 20px; right: 20px; z-index: 15;
+            width: 120px; height: 120px;
+        }
+        .d-pad-btn {
+            position: absolute; width: 40px; height: 40px; background: rgba(255,255,255,0.2);
+            border-radius: 5px; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold;
+        }
+        .d-pad-btn:active { background: rgba(16, 185, 129, 0.5); }
+        
+        /* Mini Game Overlay */
+        #minigame-overlay {
+            position: absolute; inset: 0; background: rgba(0,0,0,0.9); z-index: 60;
+            display: none; flex-direction: column; align-items: center; justify-content: center;
+        }
+        .eps-panel {
+            width: 60px; height: 150px; background: #f5f5f5; border: 2px solid #ccc;
+            border-radius: 4px; cursor: pointer; transition: all 0.3s;
+            display: flex; align-items: center; justify-content: center; font-weight: bold; color: #333;
+        }
+        .eps-panel.snapped { background: #10b981; color: white; border-color: #059669; transform: scale(0.95); pointer-events: none; }
+
+    </style>
+</head>
+<body>
+
+    <!-- Cinematic Opening Loader -->
+    <div id="opening-loader">
+        <h1 class="text-3xl md:text-5xl font-bold tracking-widest mb-6 text-white text-center">GSIH <span class="text-emerald-500">x</span> GREENSHIFT</h1>
+        <div class="w-64 h-1 bg-gray-800 rounded overflow-hidden">
+            <div id="loader-bar" class="h-full bg-emerald-500 w-0 transition-all duration-300"></div>
+        </div>
+        <p id="loader-text" class="mt-6 text-xs tracking-[0.3em] text-gray-500 uppercase">Generating 3D Environment...</p>
+    </div>
+
+    <!-- Cinematic Closing Loader -->
+    <div id="closing-loader" class="opacity-0 invisible">
+        <h1 class="text-4xl md:text-6xl font-bold tracking-tight mb-4 text-white text-center">LEAD THE FUTURE.</h1>
+        <p class="text-emerald-500 tracking-[0.2em] uppercase text-sm md:text-lg">The Pioneer of the Green Zone</p>
+        <button id="btn-restart" class="mt-10 border border-emerald-500 text-emerald-500 hover:bg-emerald-500 hover:text-white px-8 py-3 rounded uppercase tracking-wider text-sm transition-colors">Return to Hub</button>
+    </div>
+
+    <!-- UI Overlays -->
+    <div id="blocker" style="display: none;">
+        <div id="instructions" class="p-6 md:p-8 border border-gray-700 rounded-xl bg-black/60 md:bg-black/50 hover:bg-black/80 transition-all w-11/12 max-w-lg shadow-2xl backdrop-blur-md">
+            <h1 class="text-3xl md:text-4xl font-bold tracking-tight mb-2 text-white">GARUDA SPARK <br/><span class="text-emerald-500">INNOVATION HUB</span></h1>
+            <p class="text-gray-300 mb-6 uppercase tracking-widest text-xs md:text-sm">GreenShift - Retrofit Proposal</p>
+            <div class="space-y-3 text-left bg-gray-900/50 p-4 md:p-6 rounded-lg mb-6 text-sm">
+                <button id="btn-tour" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 px-4 rounded-lg transition-colors flex justify-between items-center group shadow-lg shadow-emerald-900/50">
+                    <span>Guided Cinematic Tour</span>
+                    <span class="group-hover:translate-x-1 transition-transform">→</span>
+                </button>
+                <button id="btn-roam" class="w-full bg-transparent border border-gray-600 hover:border-white text-gray-300 hover:text-white font-bold py-3 px-4 rounded-lg transition-colors flex justify-between items-center">
+                    <span>Free Roam Simulation</span>
+                </button>
+            </div>
+            <p class="text-xs text-gray-500 text-center uppercase tracking-wider hidden md:block">Use WASD & Mouse to navigate in Free Roam</p>
+            <p class="text-xs text-gray-500 text-center uppercase tracking-wider md:hidden">Use touch controls to navigate in Free Roam</p>
+        </div>
+    </div>
+
+    <!-- Presentation UI -->
+    <div id="presentation-ui">
+        <div class="slide-panel visible" id="slide-panel">
+            <p class="text-emerald-500 font-bold tracking-widest text-[10px] md:text-xs uppercase mb-1 md:mb-2" id="slide-subtitle">Phase</p>
+            <h2 class="text-2xl md:text-3xl font-bold mb-3 md:mb-4" id="slide-title">Title</h2>
+            <p class="text-gray-300 text-xs md:text-sm leading-relaxed mb-4 md:mb-6" id="slide-desc">Description</p>
+            
+            <!-- Game Injection Point -->
+            <div id="game-trigger-container" class="hidden mb-4">
+                <button id="btn-play-game" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white py-2 rounded text-sm font-bold uppercase tracking-wider animate-pulse">Try Interactive Assembly</button>
+            </div>
+
+            <div class="bg-black/50 p-3 md:p-4 rounded text-xs md:text-sm border border-gray-800" id="slide-stats">
+                <!-- Stats injected here -->
+            </div>
+        </div>
+        <div class="tour-controls">
+            <button id="tour-prev" class="text-gray-400 hover:text-white px-2 md:px-3 py-2 uppercase text-[10px] md:text-xs font-bold tracking-wider">&larr; Prev</button>
+            <div class="h-4 md:h-6 w-px bg-gray-700"></div>
+            <button id="tour-next" class="text-emerald-400 hover:text-emerald-300 px-2 md:px-3 py-2 uppercase text-[10px] md:text-xs font-bold tracking-wider">Next Slide &rarr;</button>
+            <div class="h-4 md:h-6 w-px bg-gray-700"></div>
+            <button id="tour-exit" class="text-red-400 hover:text-red-300 px-2 md:px-3 py-2 uppercase text-[10px] md:text-xs font-bold tracking-wider">Exit</button>
+        </div>
+    </div>
+
+    <!-- Mini Game Overlay -->
+    <div id="minigame-overlay">
+        <div class="bg-gray-900 border border-emerald-500 p-8 rounded-xl max-w-md w-11/12 text-center shadow-2xl shadow-emerald-900/20">
+            <h2 class="text-2xl font-bold text-white mb-2">Fjäll EPS Flatpack</h2>
+            <p class="text-gray-400 text-sm mb-8">Tap the loose panels below to snap them perfectly into the mall framework. No drilling required.</p>
+            
+            <div class="flex justify-center gap-2 mb-8 h-[160px] p-2 border border-gray-700 rounded bg-black/50 relative" id="game-zone">
+                <div class="eps-panel absolute" style="left: 10%; top: 10px; transform: rotate(-10deg);" onclick="snapPanel(this, 1)">1</div>
+                <div class="eps-panel absolute" style="left: 40%; top: 20px; transform: rotate(5deg);" onclick="snapPanel(this, 2)">2</div>
+                <div class="eps-panel absolute" style="left: 70%; top: 5px; transform: rotate(-5deg);" onclick="snapPanel(this, 3)">3</div>
+                
+                <!-- Target Slots -->
+                <div class="absolute w-[60px] h-[150px] border-2 border-dashed border-gray-600 rounded flex items-center justify-center text-gray-600 font-bold" style="left: 40px; top: 3px; z-index: 0;">Slot 1</div>
+                <div class="absolute w-[60px] h-[150px] border-2 border-dashed border-gray-600 rounded flex items-center justify-center text-gray-600 font-bold" style="left: 120px; top: 3px; z-index: 0;">Slot 2</div>
+                <div class="absolute w-[60px] h-[150px] border-2 border-dashed border-gray-600 rounded flex items-center justify-center text-gray-600 font-bold" style="left: 200px; top: 3px; z-index: 0;">Slot 3</div>
+            </div>
+
+            <div id="game-success" class="hidden mb-6">
+                <p class="text-emerald-400 font-bold text-lg mb-1">Assembly Complete!</p>
+                <p class="text-xs text-gray-300 uppercase tracking-wider">5x Faster Installation Achieved</p>
+            </div>
+
+            <button onclick="closeGame()" id="btn-close-game" class="w-full bg-gray-700 hover:bg-gray-600 text-white font-bold py-3 rounded opacity-50 cursor-not-allowed transition-all" disabled>Return to Tour</button>
+        </div>
+    </div>
+
+    <!-- HUD & Mobile Controls -->
+    <div class="hud-overlay" style="display: none;">
+        <div class="bg-black/80 border border-gray-800 p-3 rounded-lg backdrop-blur-sm">
+            <h2 class="text-white font-bold text-sm md:text-lg mb-1">GSIH Prototype Zone</h2>
+            <div class="flex items-center gap-2 text-gray-400 text-xs md:text-sm">
+                <div class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
+                Free Roam Active
+            </div>
+        </div>
+    </div>
+
+    <div id="mobile-controls">
+        <div class="d-pad-btn" style="top: 0; left: 40px;" id="btn-up">W</div>
+        <div class="d-pad-btn" style="top: 40px; left: 0;" id="btn-left">A</div>
+        <div class="d-pad-btn" style="top: 40px; left: 80px;" id="btn-right">D</div>
+        <div class="d-pad-btn" style="top: 80px; left: 40px;" id="btn-down">S</div>
+    </div>
+
+    <div id="info-panel">
+        <div class="flex items-center gap-3 mb-2 border-b border-gray-700 pb-2">
+            <div class="w-6 h-6 rounded bg-emerald-900 flex items-center justify-center text-emerald-400">
+                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="currentColor" viewBox="0 0 16 16"><path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z"/><path d="m8.93 6.588-2.29.287-.082.38.45.083c.294.07.352.176.288.469l-.738 3.468c-.194.897.105 1.319.808 1.319.545 0 1.178-.252 1.465-.598l.088-.416c-.2.176-.492.246-.686.246-.275 0-.375-.193-.304-.533L8.93 6.588zM9 4.5a1 1 0 1 1-2 0 1 1 0 0 1 2 0z"/></svg>
+            </div>
+            <h3 id="info-title" class="font-bold text-sm tracking-wide uppercase text-white">Feature</h3>
+        </div>
+        <p id="info-desc" class="text-gray-300 text-xs leading-relaxed"></p>
+    </div>
+
+    <!-- 3D Canvas Container -->
+    <div id="canvas-container"></div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+    <script>
+        // Detection
+        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        
+        let camera, scene, renderer;
+        let prevTime = performance.now();
+        const velocity = new THREE.Vector3();
+        const direction = new THREE.Vector3();
+        
+        let moveForward = false, moveBackward = false, moveLeft = false, moveRight = false;
+
+        // Tour Variables
+        let isIntroSequence = false;
+        let isTourMode = false;
+        let isFreeRoam = false;
+        let currentSlide = 0;
+        let targetCamPos = new THREE.Vector3();
+        let targetCamLookAt = new THREE.Vector3();
+        let currentLookAt = new THREE.Vector3();
+
+        // Presentation Data
+        const slides = [
+            {
+                subtitle: "GSIH x GreenShift", title: "The Core Vision",
+                desc: "GSIH is the genesis of Jakarta's premier Green Hub. We are merging a high-tech 'Monochrome Sleek' aesthetic with environmentally responsible engineering.",
+                stats: `<div class="flex justify-between mb-1"><span class="text-gray-400">Total Area</span><span class="font-bold">260 sqm</span></div>
+                        <div class="flex justify-between"><span class="text-gray-400">Location</span><span class="font-bold">FX Sudirman</span></div>`,
+                camPos: new THREE.Vector3(-3, 2.5, -2), lookAt: new THREE.Vector3(-5, 1.5, 3), hasGame: false
+            },
+            {
+                subtitle: "Material Innovation", title: "Fjäll EPS Panels",
+                desc: "Replacing obsolete, dust-heavy brick with advanced 20cm EPS modular walls built slab-to-slab (3.6m). Superior acoustic isolation for Komdigi.",
+                stats: `<div class="flex justify-between mb-1"><span class="text-gray-400">Panel Thickness</span><span class="font-bold text-white">20 cm</span></div>
+                        <div class="flex justify-between"><span class="text-gray-400">Sourcing</span><span class="font-bold text-emerald-400">100% Local</span></div>`,
+                camPos: new THREE.Vector3(-1.0, 1.6, -1.0), lookAt: new THREE.Vector3(-0.5, 1.6, 3), hasGame: true
+            },
+            {
+                subtitle: "Value Engineering", title: "Crystal Clear Logic",
+                desc: "Employing high-impact 12mm clear cast acrylic for meeting room transparencies instead of heavy, expensive tempered glass. Maximizes installation speed.",
+                stats: `<div class="flex justify-between mb-1"><span class="text-gray-400">Material Variant</span><span class="font-bold text-white">12mm Cast Acrylic</span></div>
+                        <div class="flex justify-between"><span class="text-gray-400">Benefit</span><span class="font-bold text-emerald-400">Night-Shift Speed</span></div>`,
+                camPos: new THREE.Vector3(-4.5, 1.6, 3.4), lookAt: new THREE.Vector3(-2.35, 1.6, 3.4), hasGame: false
+            },
+            {
+                subtitle: "Structural Agility", title: "Zero-Screw Protocol",
+                desc: "Puzzle-fit, snap-together flooring assembly. We do not drill into the existing mall flooring, ensuring zero structural damage to FX Sudirman.",
+                stats: `<div class="flex justify-between mb-1"><span class="text-gray-400">Flooring Interface</span><span class="font-bold text-white">Premium SPC</span></div>
+                        <div class="flex justify-between"><span class="text-gray-400">Structural Damage</span><span class="font-bold text-emerald-400">Zero Drilling</span></div>`,
+                camPos: new THREE.Vector3(-6, 1.0, 5), lookAt: new THREE.Vector3(-6, 0, 2), hasGame: false
+            },
+            {
+                subtitle: "Financial Architecture", title: "The 600M Guarantee",
+                desc: "Our modular approach eliminates wet-work, dust, and curing delays—guaranteeing operational readiness in just 35 nights within budget.",
+                stats: `<div class="flex justify-between mb-1"><span class="text-gray-400">Launch Timeline</span><span class="font-bold text-yellow-400">5 Weeks</span></div>
+                        <div class="flex justify-between mt-2 pt-2 border-t border-gray-700"><span class="text-gray-400 uppercase text-[10px] mt-1">Target Budget</span><span class="font-bold text-white">600,000,000 IDR</span></div>`,
+                camPos: new THREE.Vector3(-3, 6, 8), lookAt: new THREE.Vector3(-2, 0, 0), hasGame: false
+            }
+        ];
+
+        // Custom First Person Controls logic
+        let pitch = 0; let yaw = 0;
+        let touchStartX, touchStartY;
+        let isPointerLocked = false;
+
+        window.onload = function () {
+            initLoader();
+        };
+
+        function initLoader() {
+            let progress = 0;
+            const bar = document.getElementById('loader-bar');
+            
+            // Simulate Loading
+            const int = setInterval(() => {
+                progress += Math.random() * 15;
+                if(progress > 100) progress = 100;
+                bar.style.width = progress + '%';
+                
+                if(progress === 100) {
+                    clearInterval(int);
+                    setTimeout(() => {
+                        document.getElementById('opening-loader').style.opacity = '0';
+                        setTimeout(() => {
+                            document.getElementById('opening-loader').style.visibility = 'hidden';
+                            init3D();
+                            startIntroSequence();
+                            animate();
+                        }, 1500);
+                    }, 500);
+                }
+            }, 150);
+        }
+
+        function init3D() {
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x0a0a0c);
+            scene.fog = new THREE.Fog(0x0a0a0c, 2, 25); 
+
+            camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 100);
+            camera.rotation.order = "YXZ"; // Important for FPS look
+
+            renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); // optimize mobile
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            document.getElementById('canvas-container').appendChild(renderer.domElement);
+
+            // UI Listeners
+            document.getElementById('btn-roam').addEventListener('click', startFreeRoam);
+            document.getElementById('btn-tour').addEventListener('click', () => startTour(false));
+            document.getElementById('btn-play-game').addEventListener('click', openMiniGame);
+            
+            document.getElementById('tour-next').addEventListener('click', () => changeSlide(1));
+            document.getElementById('tour-prev').addEventListener('click', () => changeSlide(-1));
+            document.getElementById('tour-exit').addEventListener('click', exitTour);
+            document.getElementById('btn-restart').addEventListener('click', resetApp);
+
+            // Controls Setup
+            if(isMobile) {
+                setupMobileControls();
+            } else {
+                setupDesktopControls();
+            }
+
+            buildEnvironment();
+            window.addEventListener('resize', onWindowResize, false);
+        }
+
+        function setupDesktopControls() {
+            document.addEventListener('keydown', e => {
+                if(!isFreeRoam) return;
+                if (e.code === 'KeyW' || e.code === 'ArrowUp') moveForward = true;
+                if (e.code === 'KeyA' || e.code === 'ArrowLeft') moveLeft = true;
+                if (e.code === 'KeyS' || e.code === 'ArrowDown') moveBackward = true;
+                if (e.code === 'KeyD' || e.code === 'ArrowRight') moveRight = true;
+            });
+            document.addEventListener('keyup', e => {
+                if (e.code === 'KeyW' || e.code === 'ArrowUp') moveForward = false;
+                if (e.code === 'KeyA' || e.code === 'ArrowLeft') moveLeft = false;
+                if (e.code === 'KeyS' || e.code === 'ArrowDown') moveBackward = false;
+                if (e.code === 'KeyD' || e.code === 'ArrowRight') moveRight = false;
+            });
+
+            renderer.domElement.addEventListener('mousedown', () => {
+                if(isFreeRoam && !isPointerLocked) renderer.domElement.requestPointerLock();
+            });
+
+            document.addEventListener('pointerlockchange', () => {
+                isPointerLocked = document.pointerLockElement === renderer.domElement;
+            });
+
+            document.addEventListener('mousemove', e => {
+                if (isPointerLocked && isFreeRoam) {
+                    yaw -= e.movementX * 0.002;
+                    pitch -= e.movementY * 0.002;
+                    pitch = Math.max(-Math.PI/2, Math.min(Math.PI/2, pitch));
+                    camera.rotation.set(pitch, yaw, 0);
+                }
+            });
+        }
+
+        function setupMobileControls() {
+            // Touch Look
+            renderer.domElement.addEventListener('touchstart', e => {
+                touchStartX = e.touches[0].pageX;
+                touchStartY = e.touches[0].pageY;
+            }, {passive: true});
+            
+            renderer.domElement.addEventListener('touchmove', e => {
+                if(!isFreeRoam) return;
+                let dx = e.touches[0].pageX - touchStartX;
+                let dy = e.touches[0].pageY - touchStartY;
+                yaw -= dx * 0.005;
+                pitch -= dy * 0.005;
+                pitch = Math.max(-Math.PI/2, Math.min(Math.PI/2, pitch));
+                camera.rotation.set(pitch, yaw, 0);
+                touchStartX = e.touches[0].pageX;
+                touchStartY = e.touches[0].pageY;
+            }, {passive: true});
+
+            // On Screen D-PAD
+            const setupBtn = (id, prop) => {
+                const btn = document.getElementById(id);
+                btn.addEventListener('touchstart', (e) => { e.preventDefault(); window[prop] = true; });
+                btn.addEventListener('touchend', (e) => { e.preventDefault(); window[prop] = false; });
+            };
+            setupBtn('btn-up', 'moveForward');
+            setupBtn('btn-down', 'moveBackward');
+            setupBtn('btn-left', 'moveLeft');
+            setupBtn('btn-right', 'moveRight');
+        }
+
+        function buildEnvironment() {
+            // Lighting
+            scene.add(new THREE.AmbientLight(0xffffff, 0.4));
+            const dirLight = new THREE.DirectionalLight(0xffffff, 0.5);
+            dirLight.position.set(5, 10, 5); dirLight.castShadow = true;
+            scene.add(dirLight);
+
+            const pt1 = new THREE.PointLight(0x00ffaa, 0.4, 10); pt1.position.set(-5, 3.4, -5); scene.add(pt1);
+            const pt2 = new THREE.PointLight(0x00ccff, 0.3, 10); pt2.position.set(5, 3.4, 5); scene.add(pt2);
+
+            // Accurate Materials
+            const floorMat = new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.2, metalness: 0.1 }); 
+            const wallEpsMat = new THREE.MeshStandardMaterial({ color: 0xf5f5f5, roughness: 0.9, metalness: 0.0 }); 
+            const darkWallMat = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.6 }); 
+            
+            // Dynamic Ceiling Material for Intro Transition
+            window.ceilingMat = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.6, transparent: true, opacity: 0.0 }); 
+
+            const glassMat = new THREE.MeshPhysicalMaterial({
+                color: 0xffffff, metalness: 0.1, roughness: 0.05, opacity: 0.25,
+                transparent: true, transmission: 0.9, clearcoat: 1.0, side: THREE.DoubleSide
+            });
+            const deskMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.2 });
+            const legMat = new THREE.MeshStandardMaterial({ color: 0x222222, metalness: 0.8 });
+
+            const frostedGlassMat = new THREE.MeshPhysicalMaterial({
+                color: 0xffffff, metalness: 0.1, roughness: 0.8, opacity: 0.85,
+                transparent: true, transmission: 0.2, side: THREE.DoubleSide
+            });
+            const accentYellowMat = new THREE.MeshStandardMaterial({ color: 0xeab308, roughness: 0.4 });
+            const seatBlueMat = new THREE.MeshStandardMaterial({ color: 0x1e3a8a, roughness: 0.6 }); 
+            const seatGreyMat = new THREE.MeshStandardMaterial({ color: 0x6b7280, roughness: 0.6 }); 
+            const tvFrameMat = new THREE.MeshStandardMaterial({ color: 0x050505, roughness: 0.2 });
+            const tvScreenMat = new THREE.MeshBasicMaterial({ color: 0x3b82f6 });
+
+            // Floor & Ceiling
+            const floor = new THREE.Mesh(new THREE.PlaneGeometry(30, 30), floorMat);
+            floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true; scene.add(floor);
+            
+            const ceiling = new THREE.Mesh(new THREE.PlaneGeometry(30, 30), window.ceilingMat);
+            ceiling.rotation.x = Math.PI / 2; ceiling.position.y = 3.6; scene.add(ceiling);
+
+            // Helper
+            function createW(w, h, d, x, y, z, mat) {
+                const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+                mesh.position.set(x, y, z); mesh.castShadow = true; mesh.receiveShadow = true;
+                scene.add(mesh); return mesh;
+            }
+
+            // --- FURNITURE & FIXTURE FACTORIES ---
+            function createOfficeChair(x, z, angle, isBlue = false) {
+                const group = new THREE.Group();
+                const mat = isBlue ? seatBlueMat : seatGreyMat;
+                const seat = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.05, 0.5), mat); seat.position.y = 0.45; seat.castShadow = true; group.add(seat);
+                const back = new THREE.Mesh(new THREE.BoxGeometry(0.45, 0.5, 0.05), mat); back.position.set(0, 0.75, -0.22); back.rotation.x = -0.1; back.castShadow = true; group.add(back);
+                const headrest = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.1, 0.05), mat); headrest.position.set(0, 1.05, -0.25); group.add(headrest);
+                const column = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.4), legMat); column.position.y = 0.2; group.add(column);
+                const base = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.25, 0.05), legMat); base.position.y = 0.025; group.add(base);
+                group.position.set(x, 0, z); group.rotation.y = angle; scene.add(group);
+            }
+            function createTable(w, d, x, z) {
+                createW(w, 0.05, d, x, 0.75, z, deskMat);
+                createW(0.05, 0.75, 0.05, x - w/2 + 0.1, 0.375, z - d/2 + 0.1, legMat);
+                createW(0.05, 0.75, 0.05, x + w/2 - 0.1, 0.375, z - d/2 + 0.1, legMat);
+                createW(0.05, 0.75, 0.05, x - w/2 + 0.1, 0.375, z + d/2 - 0.1, legMat);
+                createW(0.05, 0.75, 0.05, x + w/2 - 0.1, 0.375, z + d/2 - 0.1, legMat);
+            }
+            function createTV(x, y, z, angle) {
+                const group = new THREE.Group();
+                const frame = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.9, 0.08), tvFrameMat);
+                const screen = new THREE.Mesh(new THREE.PlaneGeometry(1.5, 0.8), tvScreenMat); screen.position.z = 0.041;
+                group.add(frame); group.add(screen); group.position.set(x, y, z); group.rotation.y = angle; scene.add(group);
+            }
+            function createSlattedWall(w, h, x, y, z, angle) {
+                const group = new THREE.Group();
+                const numSlats = Math.floor(w / 0.1);
+                for(let i=0; i<numSlats; i++) {
+                    const slat = new THREE.Mesh(new THREE.BoxGeometry(0.04, h, 0.04), darkWallMat);
+                    slat.position.set(-w/2 + (i * 0.1) + 0.05, 0, 0); group.add(slat);
+                }
+                group.position.set(x, y, z); group.rotation.y = angle; scene.add(group);
+            }
+            function createPantryStool(x, z) {
+                const group = new THREE.Group();
+                const seat = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 0.05, 16), deskMat); seat.position.y = 0.75;
+                const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.75, 8), legMat); leg.position.y = 0.375;
+                const base = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.02, 16), legMat); base.position.y = 0.01;
+                group.add(seat); group.add(leg); group.add(base); group.position.set(x, 0, z); scene.add(group);
+            }
+            function createBookshelf(x, y, z, angle) {
+                const group = new THREE.Group();
+                const shelfMat = new THREE.MeshStandardMaterial({color: 0xeeeeee, roughness: 0.3});
+                group.add(new THREE.Mesh(new THREE.BoxGeometry(2.0, 2.4, 0.3), shelfMat));
+                const hollow = new THREE.Mesh(new THREE.BoxGeometry(1.8, 2.2, 0.31), darkWallMat); hollow.position.z = 0.02; group.add(hollow);
+                for(let i=1; i<=4; i++) {
+                    const shelf = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.05, 0.25), shelfMat); shelf.position.set(0, -1.2 + (i * 0.48), 0.05); group.add(shelf);
+                }
+                group.position.set(x, y, z); group.rotation.y = angle; scene.add(group);
+            }
+
+            // ACCURATE ARCHITECTURAL BUILD (Scale 1 unit = 1m)
+            
+            // 1. Perimeter (0.2m thick)
+            createW(7.9, 3.6, 0.2, 2.25, 1.8, -5.175, darkWallMat); 
+            createW(6.675, 3.6, 0.2, -5.0375, 1.8, -3.975, darkWallMat); 
+            createW(0.2, 3.6, 14.5, -8.375, 1.8, 3.275, darkWallMat); 
+            createW(14.575, 3.6, 0.2, -1.0875, 1.8, 10.525, darkWallMat); 
+            createW(0.2, 3.6, 15.7, 6.2, 1.8, 2.675, darkWallMat); 
+            
+            // 2. Pantry
+            createW(0.2, 3.6, 7.35, -5.925, 1.8, -7.65, darkWallMat); 
+            createW(4.2, 3.6, 0.2, -3.825, 1.8, -11.325, darkWallMat); 
+            createW(0.2, 3.6, 6.15, -1.725, 1.8, -8.25, darkWallMat); 
+            
+            // Pantry Furniture
+            createW(2.5, 1.0, 0.8, -3.8, 0.5, -8.0, darkWallMat); // Counter
+            createW(0.8, 1.0, 1.5, -2.95, 0.5, -7.15, darkWallMat); // L-Return
+            createW(2.6, 0.05, 0.9, -3.8, 1.0, -8.0, deskMat); // Counter Top White
+            createW(2.5, 0.1, 0.1, -3.8, 0.1, -7.5, accentYellowMat); // Yellow Footrest Trim
+            createPantryStool(-4.5, -7.2);
+            createPantryStool(-3.8, -7.2);
+            createPantryStool(-3.1, -7.2);
+            createW(1.2, 0.8, 0.6, -5.3, 0.4, -4.5, accentYellowMat); // "break!" box
+
+            // 3. Central Core (EPS = 0.2m, Glass = 0.012m)
+            createW(0.012, 3.6, 6.8, -2.35, 1.8, 3.4, glassMat); // Acrylic Fronts
+            const frostedDecal = new THREE.Mesh(new THREE.BoxGeometry(0.015, 1.0, 6.8), frostedGlassMat);
+            frostedDecal.position.set(-2.35, 1.0, 3.4);
+            scene.add(frostedDecal);
+
+            createW(0.2, 3.6, 6.8, 1.35, 1.8, 3.4, wallEpsMat); 
+            createW(3.7, 3.6, 0.2, -0.5, 1.8, 0.0, wallEpsMat); 
+            createW(3.7, 3.6, 0.2, -0.5, 1.8, 3.25, wallEpsMat); 
+            createW(3.7, 3.6, 0.2, -0.5, 1.8, 6.8, wallEpsMat); 
+
+            // Tables in meeting rooms
+            createTable(2.2, 1.0, -0.5, 1.6); // Room 2 (Top)
+            createTV(1.2, 1.4, 1.6, -Math.PI / 2); 
+            createOfficeChair(-0.5, 0.8, 0, true);
+            createOfficeChair(-1.2, 1.0, Math.PI/4, true);
+            createOfficeChair(0.2, 1.0, -Math.PI/4, true);
+            createOfficeChair(-0.5, 2.4, Math.PI, true);
+            createOfficeChair(-1.2, 2.2, Math.PI - Math.PI/4, true);
+            createOfficeChair(0.2, 2.2, Math.PI + Math.PI/4, true);
+
+            createTable(2.2, 1.0, -0.5, 5.0); // Room 1 (Bottom)
+            createTV(1.2, 1.4, 5.0, -Math.PI / 2); 
+            createOfficeChair(-0.5, 4.2, 0, true);
+            createOfficeChair(-1.2, 4.4, Math.PI/4, true);
+            createOfficeChair(0.2, 4.4, -Math.PI/4, true);
+            createOfficeChair(-0.5, 5.8, Math.PI, true);
+            createOfficeChair(-1.2, 5.6, Math.PI - Math.PI/4, true);
+            createOfficeChair(0.2, 5.6, Math.PI + Math.PI/4, true);
+
+            // 4. Core Block
+            createW(4.05, 3.6, 6.8, 3.475, 1.8, 3.4, darkWallMat); 
+            createSlattedWall(4.05, 3.6, 3.475, 1.8, -0.05, 0);
+
+            // 5. Left Meeting Room
+            createW(0.2, 3.6, 3.5, -4.175, 1.8, 8.775, wallEpsMat); 
+            createW(4.2, 3.6, 0.012, -6.275, 1.8, 7.025, glassMat); 
+            
+            createTable(2.0, 1.0, -6.0, 8.8);
+            createOfficeChair(-6.0, 8.0, 0, false);
+            createOfficeChair(-6.0, 9.6, Math.PI, false);
+
+            // Transit Room / Lobby Furniture
+            createBookshelf(5.6, 1.2, -0.8, 0); 
+            createW(1.5, 0.4, 0.6, 7.0, 0.2, 1.5, deskMat); // Art Table
+            createOfficeChair(6.4, 1.5, Math.PI/2, false);
+
+            // Communal Area Desks
+            createTable(2.4, 1.2, -5.5, 0.8);
+            createOfficeChair(-5.5, 0.0, 0, false);
+            createOfficeChair(-5.5, 1.6, Math.PI, false);
+            createOfficeChair(-4.6, 0.8, -Math.PI/2, false);
+            
+            createTable(2.4, 1.2, -5.5, 3.8);
+            createOfficeChair(-5.5, 3.0, 0, false);
+            createOfficeChair(-5.5, 4.6, Math.PI, false);
+            createOfficeChair(-4.6, 3.8, -Math.PI/2, false);
+        }
+
+        // --- Interaction Logic ---
+        function startIntroSequence() {
+            document.getElementById('blocker').style.display = 'none';
+            isIntroSequence = true;
+            isTourMode = false;
+            isFreeRoam = false;
+
+            // Start High Above (Overview Map Angle)
+            camera.position.set(-1, 16, 2);
+            currentLookAt.set(-1, 0, 2);
+            camera.lookAt(currentLookAt);
+            
+            // Hold the bird's-eye view for 3 seconds, then swoop into Slide 1
+            setTimeout(() => {
+                isIntroSequence = false;
+                startTour(true);
+            }, 3000);
+        }
+
+        function startFreeRoam() {
+            document.getElementById('blocker').style.display = 'none';
+            document.querySelector('.hud-overlay').style.display = 'block';
+            if(isMobile) document.getElementById('mobile-controls').style.display = 'block';
+            if(!isMobile) renderer.domElement.requestPointerLock();
+            isFreeRoam = true;
+            isTourMode = false;
+            isIntroSequence = false;
+            
+            // Restore normal look
+            if (window.ceilingMat) window.ceilingMat.opacity = 1.0;
+        }
+
+        function startTour(isFromIntro = false) {
+            document.getElementById('blocker').style.display = 'none';
+            document.querySelector('.hud-overlay').style.display = 'none';
+            document.getElementById('mobile-controls').style.display = 'none';
+            
+            isFreeRoam = false;
+            isTourMode = true;
+            isIntroSequence = false;
+            
+            // Align virtual camera state for transition if not swooping from intro
+            if (!isFromIntro) {
+                camera.getWorldDirection(currentLookAt);
+                currentLookAt.add(camera.position);
+            }
+
+            changeSlide(0, true);
+
+            if (isFromIntro) {
+                // Delay showing the UI while we swoop down
+                setTimeout(() => {
+                    document.getElementById('presentation-ui').style.display = 'flex';
+                }, 2000);
+            } else {
+                document.getElementById('presentation-ui').style.display = 'flex';
+            }
+        }
+
+        function exitTour() {
+            document.getElementById('presentation-ui').style.display = 'none';
+            document.getElementById('blocker').style.display = 'flex';
+            isTourMode = false;
+        }
+
+        function changeSlide(dir, forceIndex = false) {
+            const slidePanel = document.getElementById('slide-panel');
+            slidePanel.classList.remove('visible');
+            
+            setTimeout(() => {
+                if (forceIndex) {
+                    currentSlide = 0;
+                } else {
+                    currentSlide += dir;
+                }
+
+                // Handle Tour End -> Closing Loader
+                if (currentSlide >= slides.length) {
+                    triggerClosingSequence();
+                    return;
+                }
+                if (currentSlide < 0) currentSlide = 0;
+
+                const slide = slides[currentSlide];
+                document.getElementById('slide-subtitle').textContent = slide.subtitle;
+                document.getElementById('slide-title').textContent = slide.title;
+                document.getElementById('slide-desc').textContent = slide.desc;
+                document.getElementById('slide-stats').innerHTML = slide.stats;
+                
+                // Show game trigger if applicable
+                document.getElementById('game-trigger-container').style.display = slide.hasGame ? 'block' : 'none';
+
+                targetCamPos.copy(slide.camPos);
+                targetCamLookAt.copy(slide.lookAt);
+
+                slidePanel.classList.add('visible');
+            }, 400);
+        }
+
+        // --- Mini Game Logic ---
+        let snappedCount = 0;
+        function openMiniGame() {
+            document.getElementById('minigame-overlay').style.display = 'flex';
+            snappedCount = 0;
+            document.getElementById('game-success').classList.add('hidden');
+            document.getElementById('btn-close-game').disabled = true;
+            document.getElementById('btn-close-game').classList.add('opacity-50', 'cursor-not-allowed');
+            
+            // Reset panels
+            const panels = document.querySelectorAll('.eps-panel');
+            panels.forEach((p, idx) => {
+                p.classList.remove('snapped');
+                p.style.left = (10 + (idx * 30)) + '%';
+                p.style.top = (10 + (idx * 5)) + 'px';
+                p.style.transform = `rotate(${[-10, 5, -5][idx]}deg)`;
+            });
+        }
+
+        function snapPanel(element, id) {
+            if(element.classList.contains('snapped')) return;
+            element.classList.add('snapped');
+            
+            // Move to slot position
+            const targets = [40, 120, 200];
+            element.style.transform = 'rotate(0deg)';
+            element.style.left = targets[id-1] + 'px';
+            element.style.top = '3px';
+            
+            snappedCount++;
+            if(snappedCount === 3) {
+                setTimeout(() => {
+                    document.getElementById('game-success').classList.remove('hidden');
+                    const btn = document.getElementById('btn-close-game');
+                    btn.disabled = false;
+                    btn.classList.remove('opacity-50', 'cursor-not-allowed');
+                    btn.classList.add('hover:bg-emerald-600', 'bg-emerald-700');
+                }, 500);
+            }
+        }
+
+        function closeGame() {
+            document.getElementById('minigame-overlay').style.display = 'none';
+            // Auto advance tour after game
+            changeSlide(1); 
+        }
+
+        // --- Closing Sequence ---
+        function triggerClosingSequence() {
+            document.getElementById('presentation-ui').style.display = 'none';
+            const closingLoader = document.getElementById('closing-loader');
+            closingLoader.classList.remove('opacity-0', 'invisible');
+            closingLoader.classList.add('opacity-100', 'visible');
+        }
+
+        function resetApp() {
+            const closingLoader = document.getElementById('closing-loader');
+            closingLoader.classList.remove('opacity-100', 'visible');
+            closingLoader.classList.add('opacity-0', 'invisible');
+            document.getElementById('blocker').style.display = 'flex';
+            isTourMode = false;
+            isFreeRoam = false;
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            const time = performance.now();
+
+            if (isIntroSequence) {
+                // Cinematic Pan from high above
+                camera.position.x += Math.sin(time * 0.0005) * 0.002;
+                camera.position.z += Math.cos(time * 0.0005) * 0.002;
+                camera.lookAt(currentLookAt);
+
+            } else if (isTourMode) {
+                // Cinematic Smoothing
+                camera.position.lerp(targetCamPos, 0.02);
+                currentLookAt.lerp(targetCamLookAt, 0.02);
+                camera.lookAt(currentLookAt);
+
+                // Idle breathing effect
+                targetCamPos.x += Math.sin(time * 0.001) * 0.001;
+                targetCamPos.y += Math.cos(time * 0.0008) * 0.0005;
+
+            } else if (isFreeRoam) {
+                // Manual Movement Calc
+                const delta = (time - prevTime) / 1000;
+                velocity.x -= velocity.x * 10.0 * delta;
+                velocity.z -= velocity.z * 10.0 * delta;
+
+                direction.z = Number(moveForward) - Number(moveBackward);
+                direction.x = Number(moveRight) - Number(moveLeft);
+                direction.normalize();
+
+                const speed = 20.0;
+                if (moveForward || moveBackward) velocity.z -= direction.z * speed * delta;
+                if (moveLeft || moveRight) velocity.x -= direction.x * speed * delta;
+
+                // Apply movement based on Camera Yaw
+                const fwd = new THREE.Vector3(0, 0, -1).applyAxisAngle(new THREE.Vector3(0,1,0), yaw);
+                const right = new THREE.Vector3(1, 0, 0).applyAxisAngle(new THREE.Vector3(0,1,0), yaw);
+                
+                camera.position.addScaledVector(fwd, -velocity.z * delta);
+                camera.position.addScaledVector(right, velocity.x * delta);
+
+                // Keep inside bounds
+                if(camera.position.x < -8.0) camera.position.x = -8.0;
+                if(camera.position.x > 8.0) camera.position.x = 8.0;
+                if(camera.position.z < -11.0) camera.position.z = -11.0;
+                if(camera.position.z > 10.0) camera.position.z = 10.0;
+                camera.position.y = 1.6; // fix height
+            }
+
+            // Ceiling Visibility Logic (Fade in/out based on camera height)
+            if (window.ceilingMat) {
+                if (camera.position.y < 4.0 && !isIntroSequence) {
+                    window.ceilingMat.opacity = Math.min(1.0, window.ceilingMat.opacity + 0.02);
+                } else {
+                    window.ceilingMat.opacity = Math.max(0.0, window.ceilingMat.opacity - 0.02);
+                }
+            }
+
+            prevTime = time;
+            renderer.render(scene, camera);
+        }
+    </script>
+</body>
+</html>
